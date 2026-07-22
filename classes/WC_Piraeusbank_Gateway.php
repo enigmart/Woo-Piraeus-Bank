@@ -415,6 +415,7 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
             $order_id = absint( get_query_var( 'order-pay' ) );
             $order    = wc_get_order( $order_id );
             $amount   = $order->get_total();
+        if ( ! $order ) { return; }
         } elseif ( ! $woocommerce->cart->is_empty() ) {
             $amount = $woocommerce->cart->total;
         }
@@ -483,6 +484,7 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
         $lang  = $availableLocales[get_locale()] ?? 'en-US';
         $order = wc_get_order( $order_id );
 
+        if ( ! $order ) { return; }
         $requestType   = $this->pb_authorize === "yes" ? '00' : '02';
         $ExpirePreauth = $this->pb_authorize === "yes" ? '30' : '0';
 
@@ -656,6 +658,7 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
     public function process_payment( $order_id ) {
         $order = wc_get_order( $order_id );
 
+        if ( ! $order ) { return array(); }
         $key = esc_attr( $this->id ) . '-card-doseis';
 
         $doseis = isset( $_POST[ $key ] ) ? (int) $_POST[ $key ] : 1;
@@ -698,6 +701,7 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
             $order_id   = sanitize_text_field( $_REQUEST['MerchantReference'] );
             $order      = wc_get_order( $order_id );
 
+            if ( ! $order ) { return; }
             if ( ! $order || ! $order->get_id() ) {
                 $this->safe_log( '---- Invalid Order ID -----', $order_id );
 
@@ -900,6 +904,7 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
 
             $order        = wc_get_order( $order_id );
             $message      = __( 'Thank you for shopping with us. <br />However, the transaction wasn\'t successful, payment wasn\'t received.', Application::PLUGIN_NAMESPACE );
+            if ( ! $order ) { return; }
             $message_type = 'error';
 
             $transaction_id = absint( $_REQUEST['SupportReferenceID'] );

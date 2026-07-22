@@ -35,6 +35,7 @@ class Application {
     public function piraeusbank_message() {
         $order_id = absint( get_query_var( 'order-received' ) );
         $order    = wc_get_order( $order_id );
+        if ( ! $order ) { return; }
         if ( method_exists( $order, 'get_payment_method' ) ) {
             $payment_method = $order->get_payment_method();
         } else {
