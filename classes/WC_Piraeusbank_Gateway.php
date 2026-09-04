@@ -56,6 +56,9 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
     /** Per-request cache of already issued Piraeus ticket forms, keyed by order id. */
     protected static array $pb_issued_forms = [];
 
+    /** Customer facing notice restored from the order, still to be printed on this request. */
+    protected ?array $pb_pending_notice = null;
+
     public function __construct() {
         global $wpdb;
 
@@ -110,6 +113,15 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
 
             // Payment listener/API hook
             add_action( 'woocommerce_api_wc_piraeusbank_gateway', [ $this, 'check_piraeusbank_response' ] );
+
+            // The bank answers with a cross-site POST. With SameSite=Lax cookies the WooCommerce
+            // session cookie is not sent on it, so wc_add_notice() there ends up in a throw away
+            // session. The customer facing message is stored on the order instead and rendered
+            // here, on the next (same-site) page load.
+            add_action( 'wp', [ $this, 'pb_maybe_render_stored_notice' ], 5 );
+            add_action( 'template_redirect', [ $this, 'pb_maybe_render_stored_notice' ], 5 );
+            add_action( 'before_woocommerce_pay', [ $this, 'pb_output_pending_notices' ], 5 );
+            add_action( 'woocommerce_before_thankyou', [ $this, 'pb_output_pending_notices' ], 5 );
         }
 
         add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, [ $this, 'process_admin_options' ] );
@@ -750,12 +762,17 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
                 $message_type = 'error';
 
                 $this->set_message( $order, $message, $message_type );
+                $this->pb_set_customer_notice( $order, $message, $message_type );
 
                 if ( function_exists( 'wc_add_notice' ) ) {
                     wc_add_notice( $message, $message_type );
                 }
 
-                $order->update_status( 'failed' );
+                // ResultCode 1048 means the order was already paid (recharge attempt): such an
+                // order must not be demoted to 'failed'.
+                if ( ! $order->is_paid() ) {
+                    $order->update_status( 'failed' );
+                }
 
                 $this->safe_log( '---- Piraeus Error -----', [
                     'ResultCode'         => $ResultCode,
@@ -768,7 +785,7 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
                     WC()->session->set( 'pb_pending_order_id', null );
                 }
 
-                wp_redirect( $order->get_checkout_payment_url( false ) );
+                wp_redirect( $this->pb_failure_redirect_url( $order ) );
                 exit;
             }
 
@@ -848,6 +865,7 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
 
                 $this->generic_add_meta( $order_id, '_piraeusbank_message', $pb_message );
                 $this->generic_add_meta( $order_id, '_piraeusbank_message_debug', [ $pb_message, $consHashHmac . '!=' . $HashKey ] );
+                $this->pb_set_customer_notice( $order, $message, $message_type );
 
                 $order->add_order_note(
                     __( 'Piraeus Paycenter: HashKey verification FAILED - the order was NOT completed.', Application::PLUGIN_NAMESPACE )
@@ -872,7 +890,7 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
                     WC()->session->set( 'pb_pending_order_id', null );
                 }
 
-                wp_redirect( $order->get_checkout_payment_url( false ) );
+                wp_redirect( $this->pb_failure_redirect_url( $order ) );
                 exit;
             }
 
@@ -923,8 +941,10 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
                     'message'      => $message,
                 ] );
 
-				// Empty cart
-				WC()->cart->empty_cart();
+				// Empty cart (WC()->cart is not initialised on the bank cross-site POST)
+				if ( WC()->cart ) {
+					WC()->cart->empty_cart();
+				}
                 $wpdb->delete(
                     $wpdb->prefix . 'piraeusbank_transactions',
                     [ 'trans_ticket' => $transTicket ],
@@ -969,8 +989,11 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
                 $message_type = 'error';
 
                 $pb_message = $this->set_message( $order, $message, $message_type );
+                $this->pb_set_customer_notice( $order, $message, $message_type );
 
-                $order->update_status( 'failed' );
+                if ( ! $order->is_paid() ) {
+                    $order->update_status( 'failed' );
+                }
 
                 if ( function_exists( 'wc_add_notice' ) ) {
                     wc_add_notice( $message, $message_type );
@@ -986,7 +1009,7 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
                     WC()->session->set( 'pb_pending_order_id', null );
                 }
 
-                wp_redirect( $order->get_checkout_payment_url( false ) );
+                wp_redirect( $this->pb_failure_redirect_url( $order ) );
                 exit;
             }
         }
@@ -995,8 +1018,11 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
             $order_id     = sanitize_text_field( $_REQUEST['MerchantReference'] );
 
 			// Session validation: ensure the callback matches the user who initiated the payment
+			// The bank posts cross-site: with SameSite=Lax the WooCommerce session cookie is
+			// normally NOT sent, so a missing session must not be treated as a rejection - that
+			// silently dropped the customer on the checkout page without any message.
 			$session_order_id = WC()->session ? WC()->session->get( 'pb_pending_order_id' ) : null;
-			if ( $session_order_id === null || $session_order_id != $order_id ) {
+			if ( $session_order_id !== null && $session_order_id != $order_id ) {
 				if ( $this->pb_enable_log === 'yes' ) {
 					error_log( 'Piraeus Bank fail callback rejected: session validation failed for order ' . $order_id );
 				}
@@ -1019,10 +1045,17 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
             $order->add_order_note( $message . '<br />Piraeus Bank Support Reference ID: ' . $transaction_id );
 
 
-            //Update the order status
-            $order->update_status( 'failed' );
+            //Update the order status - never demote an order that has already been paid.
+            if ( ! $order->is_paid() ) {
+                $order->update_status( 'failed' );
+            }
 
             $pb_message = $this->set_message( $order, $message, $message_type );
+            $this->pb_set_customer_notice( $order, $message, $message_type );
+
+            if ( function_exists( 'wc_add_notice' ) ) {
+                wc_add_notice( $message, $message_type );
+            }
 
             $this->safe_log( '---- Piraeus Payment Failed -----', [
                 'message' => $message,
@@ -1032,6 +1065,9 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
 			if ( WC()->session ) {
 				WC()->session->set( 'pb_pending_order_id', null );
 			}
+
+            wp_redirect( $this->pb_failure_redirect_url( $order ) );
+            exit;
         }
 
         if ( isset( $_REQUEST['peiraeus'] ) && ( $_REQUEST['peiraeus'] === 'cancel' ) ) {
@@ -1063,7 +1099,7 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
         if ( $this->redirect_page_id == -1 && $order !== null ) {
             $redirect_url = $this->get_return_url( $order );
         } else {
-            $redirect_url = add_query_arg( [ 'msg' => urlencode( $pb_message['message'] ), 'type' => $pb_message['class'] ], ( $this->redirect_page_id === "" || $this->redirect_page_id === 0 ) ? get_site_url() . "/" : get_permalink( $this->redirect_page_id ) );
+            $redirect_url = add_query_arg( [ 'msg' => urlencode( isset( $pb_message['message'] ) ? $pb_message['message'] : '' ), 'type' => ( isset( $pb_message['message_type'] ) ? $pb_message['message_type'] : '' ) ], ( $this->redirect_page_id === "" || $this->redirect_page_id === 0 ) ? get_site_url() . "/" : get_permalink( $this->redirect_page_id ) );
         }
 
         wp_redirect( $redirect_url );
@@ -1228,6 +1264,167 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
         $this->generic_add_meta( $order->get_id(), '_piraeusbank_message_debug', $pb_message );
 
         return $pb_message;
+    }
+
+    /**
+     * Persist the customer facing message on the order itself.
+     *
+     * The bank answers with a cross-site POST to the WC API endpoint. Because of SameSite=Lax the
+     * WooCommerce session cookie is not sent with it, so wc_add_notice() writes the notice into a
+     * brand new session that is thrown away straight afterwards. Storing the message on the order
+     * makes it survive until the customer browser follows the redirect.
+     *
+     * @param \WC_Order|null $order
+     * @param string         $message
+     * @param string         $message_type 'error' or 'notice'.
+     *
+     * @return void
+     */
+    public function pb_set_customer_notice( $order, $message, $message_type = 'error' ) {
+        if ( ! $order || ! ( $order instanceof \WC_Order ) || '' === (string) $message ) {
+            return;
+        }
+
+        $order->update_meta_data( '_piraeusbank_customer_notice', [
+            'message' => (string) $message,
+            'type'    => in_array( $message_type, [ 'error', 'success', 'notice' ], true ) ? $message_type : 'error',
+        ] );
+        $order->save();
+    }
+
+    /**
+     * Where the customer has to be sent after a failed / declined transaction.
+     *
+     * @param \WC_Order|null $order
+     *
+     * @return string
+     */
+    private function pb_failure_redirect_url( $order ) {
+        if ( ! $order || ! ( $order instanceof \WC_Order ) ) {
+            return add_query_arg( 'pb_notice', '1', wc_get_checkout_url() );
+        }
+
+        // An order that is already paid (ResultCode 1048 recharge attempt) must never be sent to
+        // the cart/checkout: the cart is legitimately empty there, which is exactly the blank
+        // "your cart is empty" page the customer was left with.
+        if ( $order->is_paid() || ! $order->needs_payment() ) {
+            $url = $order->get_checkout_order_received_url();
+        } else {
+            $url = $order->get_checkout_payment_url( false );
+        }
+
+        return add_query_arg( 'pb_notice', '1', $url );
+    }
+
+    /**
+     * Resolve and validate the order of the current front-end request.
+     *
+     * @return \WC_Order|null
+     */
+    private function pb_resolve_order_from_request() {
+        global $wp;
+
+        $order_id = 0;
+
+        foreach ( [ 'order-pay', 'order-received', 'view-order' ] as $pb_query_var ) {
+            if ( isset( $wp->query_vars[ $pb_query_var ] ) && absint( $wp->query_vars[ $pb_query_var ] ) ) {
+                $order_id = absint( $wp->query_vars[ $pb_query_var ] );
+                break;
+            }
+        }
+
+        if ( ! $order_id && isset( $_GET['order-pay'] ) ) {
+            $order_id = absint( $_GET['order-pay'] );
+        }
+
+        if ( ! $order_id && isset( $_GET['order-received'] ) ) {
+            $order_id = absint( $_GET['order-received'] );
+        }
+
+        if ( ! $order_id && isset( $_GET['order_id'] ) ) {
+            $order_id = absint( $_GET['order_id'] );
+        }
+
+        if ( ! $order_id ) {
+            return null;
+        }
+
+        $order = wc_get_order( $order_id );
+
+        if ( ! $order || ! ( $order instanceof \WC_Order ) ) {
+            return null;
+        }
+
+        $key = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : '';
+
+        if ( '' !== $key ) {
+            return hash_equals( (string) $order->get_order_key(), $key ) ? $order : null;
+        }
+
+        // No order key in the URL (my-account/view-order): only the owner may see the message.
+        $customer_id = (int) $order->get_customer_id();
+
+        return ( $customer_id && get_current_user_id() === $customer_id ) ? $order : null;
+    }
+
+    /**
+     * Print the message that check_piraeusbank_response() stored on the order, exactly once.
+     *
+     * @return void
+     */
+    public function pb_maybe_render_stored_notice() {
+        static $pb_already_run = false;
+
+        if ( $pb_already_run || is_admin() || ! isset( $_GET['pb_notice'] ) ) {
+            return;
+        }
+
+        $order = $this->pb_resolve_order_from_request();
+
+        if ( ! $order ) {
+            return;
+        }
+
+        $notice = $order->get_meta( '_piraeusbank_customer_notice', true );
+
+        if ( empty( $notice ) || empty( $notice['message'] ) ) {
+            return;
+        }
+
+        $pb_already_run = true;
+
+        $message = (string) $notice['message'];
+        $type    = ! empty( $notice['type'] ) ? (string) $notice['type'] : 'error';
+
+        // Show it only once.
+        $order->delete_meta_data( '_piraeusbank_customer_notice' );
+        $order->save();
+
+        $this->pb_pending_notice = [ 'message' => $message, 'type' => $type ];
+
+        if ( WC()->session && function_exists( 'wc_add_notice' ) ) {
+            wc_add_notice( $message, $type );
+            $this->pb_pending_notice = null;
+        }
+    }
+
+    /**
+     * The order-received template does not print the WooCommerce notice queue on its own, and a
+     * customer whose session cookie was dropped has no queue at all, so render it explicitly.
+     *
+     * @return void
+     */
+    public function pb_output_pending_notices() {
+        if ( ! empty( $this->pb_pending_notice ) && function_exists( 'wc_print_notice' ) ) {
+            wc_print_notice( $this->pb_pending_notice['message'], $this->pb_pending_notice['type'] );
+            $this->pb_pending_notice = null;
+
+            return;
+        }
+
+        if ( function_exists( 'wc_notice_count' ) && wc_notice_count() > 0 && function_exists( 'woocommerce_output_all_notices' ) ) {
+            woocommerce_output_all_notices();
+        }
     }
 
     /**
