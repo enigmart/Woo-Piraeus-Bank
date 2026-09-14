@@ -717,7 +717,51 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
     /**
      * @return void
      */
+    /** Serialize callbacks before loading the order, including simultaneous bank retries. */
     public function check_piraeusbank_response() {
+        global $wpdb;
+
+        $action = isset( $_REQUEST['peiraeus'] ) ? $_REQUEST['peiraeus'] : '';
+        if ( ! in_array( $action, [ 'success', 'fail' ], true ) ) {
+            $this->pb_process_response();
+            return;
+        }
+
+        $reference = isset( $_REQUEST['MerchantReference'] ) ? $_REQUEST['MerchantReference'] : '';
+        if ( ! is_scalar( $reference ) || ! ctype_digit( (string) $reference ) || (int) $reference < 1 ) {
+            wp_redirect( wc_get_checkout_url() );
+            exit;
+        }
+
+        $lock = 'pb_callback_' . md5( DB_NAME . ':' . $wpdb->prefix . ':' . (int) $reference );
+        if ( '1' !== (string) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 5)', $lock ) ) ) {
+            // Do not acknowledge a callback we could not safely process.
+            wp_die( 'Payment confirmation is being processed. Please try again shortly.', '', [ 'response' => 503 ] );
+            return;
+        }
+
+        $released = false;
+        $release = static function () use ( $wpdb, $lock, &$released ) {
+            if ( ! $released ) {
+                $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+                $released = true;
+            }
+        };
+        // The existing redirect paths call exit, which does not run a finally block.
+        register_shutdown_function( $release );
+        try {
+            $this->pb_process_response();
+        } finally {
+            $release();
+        }
+    }
+
+    /** Preserve payment history even if an order was subsequently refunded or marked failed. */
+    private function pb_payment_was_completed( $order ) {
+        return $order->is_paid() || $order->get_date_paid() || $order->get_meta( '_piraeusbank_payment_processed', true );
+    }
+
+    private function pb_process_response() {
         global $wpdb;
 
         $pb_message   = [];
@@ -743,6 +787,12 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
 
 
             if ( $ResultCode !== 0 ) {
+                if ( $this->pb_payment_was_completed( $order ) ) {
+                    $this->safe_log( 'Piraeus: ignored late technical failure for a previously paid order.', [ 'MerchantReference' => $order_id ] );
+                    // This branch is not authenticated; do not disclose an order-key URL.
+                    wp_redirect( wc_get_checkout_url() );
+                    exit;
+                }
                 // Technical failure reported by Paycenter (spec 3.1 - Result codes).
                 $ResultDescription  = isset( $_REQUEST['ResultDescription'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['ResultDescription'] ) ) : '';
                 $SupportReferenceID = isset( $_REQUEST['SupportReferenceID'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['SupportReferenceID'] ) ) : '';
@@ -811,17 +861,25 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
 				error_log( 'PaymentMethod: ' . $PaymentMethod . ' CardType: ' . $CardType );
 			}
 
-            // Spec 3.1 (d): persist the full bank response on the order before evaluating it.
-            $this->pb_store_response_data( $order, $_REQUEST );
-
             $ttquery = $wpdb->prepare(
                 'SELECT trans_ticket FROM ' . $wpdb->prefix . 'piraeusbank_transactions WHERE merch_ref = %s LIMIT 100',
                 $order_id
             );
 
             $tt = $wpdb->get_results( $ttquery );
+            if ( ! is_array( $tt ) || $wpdb->last_error !== '' ) {
+                wp_die( 'Payment confirmation is temporarily unavailable. Please try again shortly.', '', [ 'response' => 503 ] );
+                return;
+            }
 
-            $this->safe_log( '---- ttquery -----', [ $ttquery, $tt ] );
+            // Successful tickets are removed from the pending table, but retained on the order.
+            // Re-verify retries with that ticket; an ID alone is never proof of payment.
+            $saved_ticket = (string) $order->get_meta( '_piraeusbank_trans_ticket', true );
+            if ( $saved_ticket !== '' ) {
+                $tt[] = (object) [ 'trans_ticket' => $saved_ticket ];
+            }
+
+            $this->safe_log( '---- Ticket lookup -----', [ 'MerchantReference' => $order_id, 'candidate_count' => count( $tt ) ] );
             $this->safe_log( '---- End of ttquery ----' );
 
             $hasHashKeyNotMatched = true;
@@ -858,6 +916,11 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
             }
 
             if ( $hasHashKeyNotMatched ) {
+                if ( $this->pb_payment_was_completed( $order ) ) {
+                    $this->safe_log( 'Piraeus: rejected invalid HashKey without changing a previously paid order.', [ 'MerchantReference' => $order_id ] );
+                    wp_redirect( wc_get_checkout_url() );
+                    exit;
+                }
                 // Spec 3.1: a response whose HashKey cannot be verified must NEVER complete the order.
                 $message      = 'Δεν ήταν δυνατή η επαλήθευση της απάντησης της τράπεζας. Η παραγγελία δεν ολοκληρώθηκε. Παρακαλούμε επικοινωνήστε με το κατάστημα.';
                 $message_type = 'error';
@@ -894,6 +957,16 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
                 exit;
             }
 
+            // Only authenticated responses reach this point. Do not repeat order mutations,
+            // payment hooks, notes, stock changes or notifications for an already handled payment.
+            if ( $this->pb_payment_was_completed( $order ) ) {
+                $this->safe_log( 'Piraeus: ignored verified callback for a previously paid order.', [ 'MerchantReference' => $order_id ] );
+                wp_redirect( $this->get_return_url( $order ) );
+                exit;
+            }
+
+            $this->pb_store_response_data( $order, $_REQUEST );
+
             // Spec 3.1: an approved transaction has ResultCode 0 AND StatusFlag 'Success'.
             $pb_is_approved = ( $StatusFlag === '' || strcasecmp( $StatusFlag, 'Success' ) === 0 );
 
@@ -905,6 +978,10 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
                 $this->generic_add_meta( $order_id, '_piraeusbank_processed_at', current_time( 'mysql' ) );
 
                 $order->payment_complete( $TransactionId );
+                if ( $order->is_paid() || $order->get_date_paid() ) {
+                    $order->update_meta_data( '_piraeusbank_payment_processed', 1 );
+                    $order->save();
+                }
 
 				//Add admin order note
                 $order->add_order_note( __( 'Payment Via Peiraeus Bank<br />Transaction ID: ', Application::PLUGIN_NAMESPACE ) . $TransactionId . __( '<br />Support Reference ID: ', Application::PLUGIN_NAMESPACE ) . $SupportReferenceID );
@@ -1033,6 +1110,11 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
             $order        = wc_get_order( $order_id );
             $message      = __( 'Thank you for shopping with us. <br />However, the transaction wasn\'t successful, payment wasn\'t received.', Application::PLUGIN_NAMESPACE );
             if ( ! $order ) { return; }
+            if ( $this->pb_payment_was_completed( $order ) ) {
+                $this->safe_log( 'Piraeus: ignored late fail callback for a previously paid order.', [ 'MerchantReference' => $order_id ] );
+                wp_redirect( wc_get_checkout_url() );
+                exit;
+            }
             $message_type = 'error';
 
             $transaction_id = absint( $_REQUEST['SupportReferenceID'] );
