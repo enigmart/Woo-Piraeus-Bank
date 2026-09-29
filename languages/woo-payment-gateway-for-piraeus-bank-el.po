@@ -630,3 +630,12 @@ msgstr ""
 #~ "Ο προεπιλεγμένος τρόπος πληρωμής είναι Αγορά, ενεργοποιήστε για Προ-"
 #~ "Έγκριση πληρωμών. Στη συνέχεια θα πρέπει να αποδέχεστε τις πληρωμές μέσα "
 #~ "από το Admin Tool της Τράπεζας Πειραιώς"
+
+msgid "Your payment has been confirmed."
+msgstr "Η πληρωμή σας επιβεβαιώθηκε."
+
+msgid "We are checking the outcome of your previous payment. Please do not start another payment yet."
+msgstr "Ελέγχουμε το αποτέλεσμα της προηγούμενης πληρωμής σας. Παρακαλούμε μην ξεκινήσετε ακόμη νέα πληρωμή."
+
+msgid "Check payment status"
+msgstr "Έλεγχος κατάστασης πληρωμής"

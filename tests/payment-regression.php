@@ -61,6 +61,8 @@ function add_query_arg($k, $v, $url) { return $url . "?" . $k . "=" . $v; }
 function is_user_logged_in() { return false; }
 class_alias('OfflineApplication', 'Papaki\\PiraeusBank\\WooCommerce\\Application');
 class OfflineApplication { const PLUGIN_NAMESPACE = 'offline'; }
+class OfflineFollowUp { static function before_payment($o) { return true; } static function ticket_issued($o,$r) {} }
+class_alias('OfflineFollowUp', 'Papaki\\PiraeusBank\\WooCommerce\\FollowUp');
 $baseline = false;
 require dirname(__DIR__) . '/classes/WC_Piraeusbank_Gateway.php';
 $reflection = new ReflectionClass('Papaki\\PiraeusBank\\WooCommerce\\WC_Piraeusbank_Gateway');

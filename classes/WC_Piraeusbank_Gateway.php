@@ -523,6 +523,14 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
             return self::$pb_issued_forms[ $order_id ];
         }
 
+        if ( ! FollowUp::before_payment( $order ) ) {
+            $url = $this->pb_payment_was_completed( $order ) ? $this->get_return_url( $order ) : $order->get_checkout_payment_url();
+            $message = $this->pb_payment_was_completed( $order )
+                ? __( 'Your payment has been confirmed.', Application::PLUGIN_NAMESPACE )
+                : __( 'We are checking the outcome of your previous payment. Please do not start another payment yet.', Application::PLUGIN_NAMESPACE );
+            return '<p>' . esc_html( $message ) . '</p><p><a href="' . esc_url( $url ) . '">' . esc_html__( 'Check payment status', Application::PLUGIN_NAMESPACE ) . '</a></p>';
+        }
+
         $merchant_reference = $this->pb_reference_for_payment( $order );
         $requestType   = $this->pb_authorize === "yes" ? '00' : '02';
         $ExpirePreauth = $this->pb_authorize === "yes" ? '30' : '0';
@@ -631,6 +639,8 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
 
 			if ( (int) $oResult->IssueNewTicketResult->ResultCode === 0 ) {
 				$wpdb->insert( $wpdb->prefix . 'piraeusbank_transactions', [ 'trans_ticket' => $oResult->IssueNewTicketResult->TranTicket, 'merch_ref' => $merchant_reference, 'timestamp' => current_time( 'mysql', 1 ) ] );
+
+                FollowUp::ticket_issued( $order, $merchant_reference );
 
 				// Store order ID in session for callback validation
 				if ( WC()->session ) {
@@ -791,7 +801,7 @@ class WC_Piraeusbank_Gateway extends \WC_Payment_Gateway {
             $order->update_meta_data( '_piraeusbank_reference_sequence', $sequence );
             $order->update_meta_data( '_piraeusbank_active_reference', $reference );
             $order->save();
-            $order->add_order_note( 'Piraeus: new payment reference after verified IRIS timeout: ' . $reference );
+            $order->add_order_note( 'Piraeus: new payment reference after verified terminal failure: ' . $reference );
         }
         return $reference;
     }

@@ -1,0 +1,595 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wsdl:definitions xmlns:s="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/" xmlns:http="http://schemas.xmlsoap.org/wsdl/http/" xmlns:mime="http://schemas.xmlsoap.org/wsdl/mime/" xmlns:tns="http://piraeusbank.gr/paycenter" xmlns:s1="http://piraeusbank.gr/paycenter/1.0" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:tm="http://microsoft.com/wsdl/mime/textMatching/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" targetNamespace="http://piraeusbank.gr/paycenter" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+  <wsdl:types>
+    <s:schema elementFormDefault="qualified" targetNamespace="http://piraeusbank.gr/paycenter">
+      <s:import namespace="http://piraeusbank.gr/paycenter/1.0" />
+      <s:element name="ProcessTransaction">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" ref="s1:TransactionRequest" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="ProcessTransactionResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="TransactionResponse" type="s1:TransactionResponse" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+    </s:schema>
+    <s:schema elementFormDefault="qualified" targetNamespace="http://piraeusbank.gr/paycenter/1.0">
+      <s:element name="TransactionRequest">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="Header" type="s1:RequestHeaderType" />
+            <s:element minOccurs="0" maxOccurs="1" name="Body">
+              <s:complexType>
+                <s:complexContent mixed="false">
+                  <s:extension base="s1:RequestBodyType">
+                    <s:sequence>
+                      <s:choice minOccurs="1" maxOccurs="1">
+                        <s:element minOccurs="0" maxOccurs="1" name="BatchInfo" type="s1:RequestBatchInfoType" />
+                        <s:element minOccurs="0" maxOccurs="1" name="TransactionInfo" type="s1:RequestTransactionType" />
+                      </s:choice>
+                    </s:sequence>
+                  </s:extension>
+                </s:complexContent>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:complexType name="RequestHeaderType">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="RequestType">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="AUTHORIZE" />
+                <s:enumeration value="CCVALIDATION_PREAUTH" />
+                <s:enumeration value="CLOSE_BATCH" />
+                <s:enumeration value="CLOSE_BATCH_CHECKSUM" />
+                <s:enumeration value="CLOSE_BATCH_RECON" />
+                <s:enumeration value="DCCINFO" />
+                <s:enumeration value="FOLLOW_UP" />
+                <s:enumeration value="ISAVAILABLE" />
+                <s:enumeration value="REFUND" />
+                <s:enumeration value="SALE" />
+                <s:enumeration value="SESSION_KEY" />
+                <s:enumeration value="SETTLE" />
+                <s:enumeration value="VOIDREQUEST" />
+                <s:enumeration value="FUNDSTRANSFER" />
+                <s:enumeration value="EMSBATCH_CLOSE" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="0" maxOccurs="1" default="SYNCHRONOUS" name="RequestMethod">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="SYNCHRONOUS" />
+                <s:enumeration value="ASYNCHRONOUS" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="0" maxOccurs="1" name="MerchantInfo" type="s1:RequestMerchantType" />
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="RequestMerchantType">
+        <s:sequence>
+          <s:element minOccurs="0" maxOccurs="1" name="AcquirerID" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="MerchantID" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="PosID" nillable="true" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="ChannelType">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="MOTO" />
+                <s:enumeration value="eCommerce" />
+                <s:enumeration value="CardPresent" />
+                <s:enumeration value="3DSecure" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="1" maxOccurs="1" name="User" nillable="true" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="Password" nillable="true" type="s:string" />
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="RequestBodyType" />
+      <s:complexType name="RequestBatchInfoType">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="BatchNo" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="TotalSalesNo" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="TotalSalesAmount" type="s:decimal" />
+          <s:element minOccurs="1" maxOccurs="1" name="TotalCancellationsNo" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="TotalCancellationAmount" type="s:decimal" />
+          <s:element minOccurs="1" maxOccurs="1" name="TotalRefundsNo" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="TotalRefundAmount" type="s:decimal" />
+          <s:element minOccurs="1" maxOccurs="1" name="SettlementsNo" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="SettlementAmount" type="s:decimal" />
+          <s:element minOccurs="0" maxOccurs="1" name="TransactionIDs">
+            <s:complexType>
+              <s:sequence>
+                <s:element minOccurs="0" maxOccurs="1" name="Sale" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="Cancel" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="Refund" type="s:string" />
+              </s:sequence>
+            </s:complexType>
+          </s:element>
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="RequestTransactionType">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="MerchantReference" nillable="true" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="TransactionReferenceID" nillable="true" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="EntryType" nillable="true">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="KeyEntry" />
+                <s:enumeration value="Swipe" />
+                <s:enumeration value="ReadEMV" />
+                <s:enumeration value="CardOnFile" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="1" maxOccurs="1" name="CurrencyCode" nillable="true" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="Amount" nillable="true" type="s:decimal" />
+          <s:element minOccurs="1" maxOccurs="1" name="Installments" nillable="true" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="ExpirePreauth" nillable="true" type="s:short" />
+          <s:element minOccurs="1" maxOccurs="1" name="TipAmount" nillable="true" type="s:decimal" />
+          <s:element minOccurs="1" maxOccurs="1" name="Bnpl" nillable="true" type="s:unsignedByte" />
+          <s:element minOccurs="1" maxOccurs="1" name="SessionKey" nillable="true" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="CardInfo" type="s1:CardInfoType" />
+          <s:element minOccurs="1" maxOccurs="1" name="AuthInfo" nillable="true" type="s1:AuthInfoType" />
+          <s:element minOccurs="1" maxOccurs="1" name="TaxCardNumber" nillable="true" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="WalletData" nillable="true" type="s1:WalletDataType" />
+          <s:element minOccurs="0" maxOccurs="1" name="LoyaltyData" type="s1:LoyaltyDataType" />
+          <s:element minOccurs="0" maxOccurs="1" name="TraceID" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="RecurringInd" nillable="true">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="R" />
+                <s:enumeration value="C" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="0" maxOccurs="1" name="RecurPurchaseDate" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="RecurFreq" nillable="true" type="s:short" />
+          <s:element minOccurs="0" maxOccurs="1" name="RecurEnd" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="RequestBrowserBasedData" nillable="true">
+            <s:complexType>
+              <s:sequence>
+                <s:element minOccurs="0" maxOccurs="1" name="BrowserIP" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="Navigator_language" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="Navigator_javaEnabled" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="Navigator_jsEnabled" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="Screen_colorDepth" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="Screen_height" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="Screen_width" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="TimezoneOffset" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="UserAgent" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="BrowserAccept" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="BrowserPlugins" type="s:string" />
+              </s:sequence>
+            </s:complexType>
+          </s:element>
+          <s:element minOccurs="1" maxOccurs="1" name="RequestBillingInfo" nillable="true">
+            <s:complexType>
+              <s:sequence>
+                <s:element minOccurs="0" maxOccurs="1" name="BillAddrCity" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="BillAddrCountry" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="BillAddrLine1" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="BillAddrLine2" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="BillAddrLine3" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="BillAddrPostCode" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="BillAddrState" type="s:string" />
+              </s:sequence>
+            </s:complexType>
+          </s:element>
+          <s:element minOccurs="1" maxOccurs="1" name="RequestShippingInfo" nillable="true">
+            <s:complexType>
+              <s:sequence>
+                <s:element minOccurs="0" maxOccurs="1" name="ShipAddrCity" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="ShipAddrCountry" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="ShipAddrLine1" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="ShipAddrLine2" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="ShipAddrLine3" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="ShipAddrPostCode" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="ShipAddrState" type="s:string" />
+              </s:sequence>
+            </s:complexType>
+          </s:element>
+          <s:element minOccurs="1" maxOccurs="1" name="RequestContactInfo" nillable="true">
+            <s:complexType>
+              <s:sequence>
+                <s:element minOccurs="0" maxOccurs="1" name="CardholderName" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="Email" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="HomePhone" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="MobilePhone" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="WorkPhone" type="s:string" />
+              </s:sequence>
+            </s:complexType>
+          </s:element>
+          <s:element minOccurs="1" maxOccurs="1" name="DeviceCategory" nillable="true">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="Browser" />
+                <s:enumeration value="MobileApp" />
+                <s:enumeration value="ThreeDSor3RIFlow" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="1" maxOccurs="1" name="AddressMatch" nillable="true">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="Y" />
+                <s:enumeration value="N" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="1" maxOccurs="1" name="DeliveryTimeframe" nillable="true">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="ElectronicDelivery" />
+                <s:enumeration value="SameDayShipping" />
+                <s:enumeration value="OvernightShipping" />
+                <s:enumeration value="TwoDayOrMoreShipping" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="0" maxOccurs="1" name="DeliveryEmailAddress" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="ReorderItemsInd" nillable="true">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="FirstTimeOrdered" />
+                <s:enumeration value="Reordered" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="1" maxOccurs="1" name="PreOrderPurchaseInd" nillable="true">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="MerchandiseAvailable" />
+                <s:enumeration value="FutureAvailability" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="1" maxOccurs="1" name="AuthMethod" nillable="true">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="No3DSRequestorAuthenticationOccurred" />
+                <s:enumeration value="LoginToCardholderAccountOwnCredentials" />
+                <s:enumeration value="LoginToCardholderAccountFederatedID" />
+                <s:enumeration value="LoginToCardholderAccountIssuerCredentials" />
+                <s:enumeration value="LoginToCardholderAccountThirdPartyAuth" />
+                <s:enumeration value="LoginToCardholderAccountFIDOAuth" />
+                <s:enumeration value="LoginToCardholderAccountFIDOAuthSigned" />
+                <s:enumeration value="SRCAssuranceData" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="1" maxOccurs="1" name="AccountAgeInd" nillable="true">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="NoAccount" />
+                <s:enumeration value="CreatedDuringThisTransaction" />
+                <s:enumeration value="LessThan30Days" />
+                <s:enumeration value="Thirty60Days" />
+                <s:enumeration value="MoreThan60Days" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="0" maxOccurs="1" name="AccountDate" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="AccountChangeInd" nillable="true">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="ChangedDuringThisTransaction" />
+                <s:enumeration value="LessThan30Days" />
+                <s:enumeration value="Thirty60Days" />
+                <s:enumeration value="MoreThan60Days" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="0" maxOccurs="1" name="AccountChange" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="AccountPwdChangeInd" nillable="true">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="NoChange" />
+                <s:enumeration value="ChangedDuringThisTransaction" />
+                <s:enumeration value="LessThan30Days" />
+                <s:enumeration value="Thirty60Days" />
+                <s:enumeration value="MoreThan60Days" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="0" maxOccurs="1" name="AccountPwdChange" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="ShipAddressUsageInd" nillable="true">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="ThisTransaction" />
+                <s:enumeration value="LessThan30Days" />
+                <s:enumeration value="Thirty60Days" />
+                <s:enumeration value="MoreThan60Days" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="1" maxOccurs="1" name="SuspiciousAccActivity" nillable="true">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="NoSuspiciousActivityHasBeenObserved" />
+                <s:enumeration value="SuspiciousActivityHasBeenObserved" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="0" maxOccurs="unbounded" name="PassengerData" nillable="true">
+            <s:complexType>
+              <s:sequence>
+                <s:element minOccurs="1" maxOccurs="1" name="PassengerTitle" nillable="true">
+                  <s:simpleType>
+                    <s:restriction base="s:string">
+                      <s:enumeration value="Mr" />
+                      <s:enumeration value="Mrs" />
+                      <s:enumeration value="Ms" />
+                      <s:enumeration value="Miss" />
+                      <s:enumeration value="Mstr" />
+                    </s:restriction>
+                  </s:simpleType>
+                </s:element>
+                <s:element minOccurs="0" maxOccurs="1" name="PassengerFirstName" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="PassengerLastName" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="PassengerPhone" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="PassengerEmail" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="DeparturePort" type="s:string" />
+                <s:element minOccurs="0" maxOccurs="1" name="ArrivalPort" type="s:string" />
+              </s:sequence>
+            </s:complexType>
+          </s:element>
+          <s:element minOccurs="0" maxOccurs="1" name="DeviceID" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="CustomerCookie" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="LanguageCode" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="AuthTimeStamp" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="WalletType" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="FundsTransferData" nillable="true">
+            <s:complexType>
+              <s:sequence>
+                <s:element minOccurs="1" maxOccurs="1" name="FT_SenderLastName" nillable="true" type="s:string" />
+                <s:element minOccurs="1" maxOccurs="1" name="FT_SenderFirstName" nillable="true" type="s:string" />
+                <s:element minOccurs="1" maxOccurs="1" name="FT_SenderAddressStreet" nillable="true" type="s:string" />
+                <s:element minOccurs="1" maxOccurs="1" name="FT_SenderAddressStreetNumber" nillable="true" type="s:string" />
+                <s:element minOccurs="1" maxOccurs="1" name="FT_SenderAddressPostalCode" nillable="true" type="s:string" />
+                <s:element minOccurs="1" maxOccurs="1" name="FT_SenderAddressCity" nillable="true" type="s:string" />
+                <s:element minOccurs="1" maxOccurs="1" name="FT_SenderAddressCountry" nillable="true" type="s:string" />
+                <s:element minOccurs="1" maxOccurs="1" name="FT_SenderCommunicationPhone" nillable="true" type="s:string" />
+              </s:sequence>
+            </s:complexType>
+          </s:element>
+          <s:element minOccurs="0" maxOccurs="1" default="false" name="IsWalletTypeWithFpan" type="s:boolean" />
+          <s:element minOccurs="0" maxOccurs="1" default="false" name="IsWalletTypeWithDpan" type="s:boolean" />
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="CardInfoType">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="CardType">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="UNKNOWN" />
+                <s:enumeration value="AlphaMasterCardBonus" />
+                <s:enumeration value="AlphaVisaBonus" />
+                <s:enumeration value="AMEX" />
+                <s:enumeration value="DinersClub" />
+                <s:enumeration value="MasterCard" />
+                <s:enumeration value="Private" />
+                <s:enumeration value="VISA" />
+                <s:enumeration value="Maestro" />
+                <s:enumeration value="VisaTransact" />
+                <s:enumeration value="MasterCardTransact" />
+                <s:enumeration value="MaestroTransact" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="0" maxOccurs="1" name="CardNumber" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="CardHolderName" nillable="true" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="ExpirationMonth" nillable="true" type="s:short" />
+          <s:element minOccurs="1" maxOccurs="1" name="ExpirationYear" nillable="true" type="s:short" />
+          <s:element minOccurs="0" maxOccurs="1" name="Cvv2" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="Aid" nillable="true" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="Emv" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="PinBlock" nillable="true" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="Track1" nillable="true" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="Track2" nillable="true" type="s:string" />
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="AuthInfoType">
+        <s:sequence>
+          <s:element minOccurs="0" maxOccurs="1" name="Cavv" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="Eci" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="Xid" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="Enrolled" type="s1:TristateType" />
+          <s:element minOccurs="1" maxOccurs="1" name="PAResStatus">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="Unknown" />
+                <s:enumeration value="Attempted" />
+                <s:enumeration value="Succeded" />
+                <s:enumeration value="Failed" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="1" maxOccurs="1" name="SignatureVerification" type="s1:TristateType" />
+          <s:element minOccurs="1" maxOccurs="1" name="Protocol" nillable="true" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="DsTransID" nillable="true" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="ProtocolFullVersion" nillable="true" type="s:string" />
+        </s:sequence>
+      </s:complexType>
+      <s:simpleType name="TristateType">
+        <s:restriction base="s:string">
+          <s:enumeration value="Undefined" />
+          <s:enumeration value="Yes" />
+          <s:enumeration value="No" />
+        </s:restriction>
+      </s:simpleType>
+      <s:complexType name="WalletDataType">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="MasterPass" nillable="true" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="VMeAuthMethod" nillable="true" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="VMeAuthReason" nillable="true" type="s:string" />
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="LoyaltyDataType">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="ClearCardAmount" nillable="true" type="s:decimal" />
+          <s:element minOccurs="1" maxOccurs="1" name="RedemptionAmount" nillable="true" type="s:decimal" />
+          <s:element minOccurs="1" maxOccurs="1" name="PointsBurned" nillable="true" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="Rate" nillable="true" type="s:decimal" />
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="TransactionResponse">
+        <s:sequence>
+          <s:element minOccurs="0" maxOccurs="1" name="Header" type="s1:ResponseHeaderType" />
+          <s:element minOccurs="0" maxOccurs="1" name="Body" type="s1:ResponseBodyType" />
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="ResponseHeaderType">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="RequestType">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="AUTHORIZE" />
+                <s:enumeration value="CCVALIDATION_PREAUTH" />
+                <s:enumeration value="CLOSE_BATCH" />
+                <s:enumeration value="CLOSE_BATCH_CHECKSUM" />
+                <s:enumeration value="CLOSE_BATCH_RECON" />
+                <s:enumeration value="DCCINFO" />
+                <s:enumeration value="FOLLOW_UP" />
+                <s:enumeration value="ISAVAILABLE" />
+                <s:enumeration value="REFUND" />
+                <s:enumeration value="SALE" />
+                <s:enumeration value="SESSION_KEY" />
+                <s:enumeration value="SETTLE" />
+                <s:enumeration value="VOIDREQUEST" />
+                <s:enumeration value="FUNDSTRANSFER" />
+                <s:enumeration value="EMSBATCH_CLOSE" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="0" maxOccurs="1" name="MerchantInfo" type="s1:ResponseMerchantType" />
+          <s:element minOccurs="1" maxOccurs="1" name="ResultCode" type="s:int" />
+          <s:element minOccurs="0" maxOccurs="1" name="ResultDescription" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="SupportReferenceID" type="s:long" />
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="ResponseMerchantType">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="MerchantID" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="PosID" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="ChannelType">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="MOTO" />
+                <s:enumeration value="eCommerce" />
+                <s:enumeration value="CardPresent" />
+                <s:enumeration value="3DSecure" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="0" maxOccurs="1" name="User" type="s:string" />
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="ResponseBodyType">
+        <s:sequence>
+          <s:element minOccurs="0" maxOccurs="1" name="TransactionInfo" type="s1:ResponseTransactionType" />
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="ResponseTransactionType">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="StatusFlag">
+            <s:simpleType>
+              <s:restriction base="s:string">
+                <s:enumeration value="Success" />
+                <s:enumeration value="Failure" />
+                <s:enumeration value="Pending" />
+              </s:restriction>
+            </s:simpleType>
+          </s:element>
+          <s:element minOccurs="0" maxOccurs="1" name="ResponseCode" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="ResponseDescription" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="TransactionID" nillable="true" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="TransactionDateTime" nillable="true" type="s:dateTime" />
+          <s:element minOccurs="1" maxOccurs="1" name="TransactionTraceNum" nillable="true" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="MerchantReference" nillable="true" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="ApprovalCode" nillable="true" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="RetrievalRef" nillable="true" type="s:string" />
+          <s:element minOccurs="1" maxOccurs="1" name="PackageNo" nillable="true" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="SessionKey" nillable="true" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="Token" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="LoyaltyResData" type="s1:LoyaltyResDataType" />
+          <s:element minOccurs="0" maxOccurs="1" name="PaymentMethod" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="IRISTransactionID" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="IRISStatus" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="TraceID" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="MaskedCard" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="CardExpirationDate" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="PanCardType" type="s:string" />
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="LoyaltyResDataType">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="AvailableAmount" nillable="true" type="s:decimal" />
+          <s:element minOccurs="1" maxOccurs="1" name="AvailablePointNumber" nillable="true" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="BurnedPointBalance" nillable="true" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="EarnedPointBalance" nillable="true" type="s:int" />
+          <s:element minOccurs="0" maxOccurs="1" name="LoyaltyTransactionId" type="s:string" />
+        </s:sequence>
+      </s:complexType>
+    </s:schema>
+  </wsdl:types>
+  <wsdl:message name="ProcessTransactionSoapIn">
+    <wsdl:part name="parameters" element="tns:ProcessTransaction" />
+  </wsdl:message>
+  <wsdl:message name="ProcessTransactionSoapOut">
+    <wsdl:part name="parameters" element="tns:ProcessTransactionResponse" />
+  </wsdl:message>
+  <wsdl:portType name="TransactionServiceSoap">
+    <wsdl:operation name="ProcessTransaction">
+      <wsdl:input message="tns:ProcessTransactionSoapIn" />
+      <wsdl:output message="tns:ProcessTransactionSoapOut" />
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:portType name="TransactionServiceHttpPost" />
+  <wsdl:binding name="TransactionServiceSoap" type="tns:TransactionServiceSoap">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" />
+    <wsdl:operation name="ProcessTransaction">
+      <soap:operation soapAction="http://piraeusbank.gr/paycenter/ProcessTransaction" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:binding name="TransactionServiceSoap12" type="tns:TransactionServiceSoap">
+    <soap12:binding transport="http://schemas.xmlsoap.org/soap/http" />
+    <wsdl:operation name="ProcessTransaction">
+      <soap12:operation soapAction="http://piraeusbank.gr/paycenter/ProcessTransaction" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:binding name="TransactionServiceHttpPost" type="tns:TransactionServiceHttpPost">
+    <http:binding verb="POST" />
+  </wsdl:binding>
+  <wsdl:service name="TransactionService">
+    <wsdl:port name="TransactionServiceSoap" binding="tns:TransactionServiceSoap">
+      <soap:address location="https://paycenter.piraeusbank.gr/services/paymentgateway.asmx" />
+    </wsdl:port>
+    <wsdl:port name="TransactionServiceSoap12" binding="tns:TransactionServiceSoap12">
+      <soap12:address location="https://paycenter.piraeusbank.gr/services/paymentgateway.asmx" />
+    </wsdl:port>
+    <wsdl:port name="TransactionServiceHttpPost" binding="tns:TransactionServiceHttpPost">
+      <http:address location="https://paycenter.piraeusbank.gr/services/paymentgateway.asmx" />
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>

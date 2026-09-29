@@ -23,6 +23,7 @@ class Application {
     }
 
     public function init() {
+        FollowUp::register();
         add_action( 'wp', [ $this, 'piraeusbank_message' ] );
         add_filter( 'woocommerce_payment_gateways', [ $this, 'woocommerce_add_piraeusbank_gateway' ] );
         add_filter( 'plugin_action_links', [ $this, 'piraeusbank_plugin_action_links' ], 10, 2 );
